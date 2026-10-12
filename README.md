@@ -7,6 +7,10 @@
 [![Alpaca Paper Markets](https://img.shields.io/badge/Alpaca-Paper_Trading-FCD535.svg?logo=alpaca&logoColor=black)](https://alpaca.markets)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+<p align="center">
+  <img src="assets/project_banner.png" alt="AgentPay-x402 Banner" width="100%">
+</p>
+
 > **Autonomous HTTP 402 Micropayment Gateway on Solana Devnet tailored for autonomous AI agents, machine-to-machine (M2M) micro-commerce, real-time quantitative alpha streams, and high-performance LLM compute settlements.**
 
 ---
