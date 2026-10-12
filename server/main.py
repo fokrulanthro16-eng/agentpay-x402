@@ -320,15 +320,15 @@ async def health_check():
 async def fetch_alpaca_market_context() -> Dict[str, Any]:
     """Fetch live account and market liquidity from Alpaca Paper Trading API."""
     config = get_settings()
-    headers = {
+    alpaca_headers = {
         "APCA-API-KEY-ID": config.ALPACA_API_KEY.strip(),
         "APCA-API-SECRET-KEY": config.ALPACA_SECRET_KEY.strip(),
+        "Accept": "application/json"
     }
-    url = "https://paper-api.alpaca.markets/v2/account"
 
     context = {
         "provider": "Alpaca Paper Trading",
-        "api_endpoint": url,
+        "api_endpoint": "https://paper-api.alpaca.markets/v2/account",
         "currency": "USD",
         "portfolio_value": 100000.0,
         "buying_power": 200000.0,
@@ -339,12 +339,9 @@ async def fetch_alpaca_market_context() -> Dict[str, Any]:
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(
-                url,
-                headers=headers,
-            )
-            if resp.status_code == 200:
-                data = resp.json()
+            alpaca_res = await client.get("https://paper-api.alpaca.markets/v2/account", headers=alpaca_headers)
+            if alpaca_res.status_code == 200:
+                data = alpaca_res.json()
                 context.update({
                     "portfolio_value": float(data.get("portfolio_value", 100000.0)),
                     "buying_power": float(data.get("buying_power", 200000.0)),
@@ -357,11 +354,11 @@ async def fetch_alpaca_market_context() -> Dict[str, Any]:
                 })
             else:
                 logger.warning(
-                    f"Alpaca Paper API returned HTTP {resp.status_code}: {resp.text}"
+                    f"Alpaca Paper API returned HTTP {alpaca_res.status_code}: {alpaca_res.text}"
                 )
-                context["http_status"] = resp.status_code
+                context["http_status"] = alpaca_res.status_code
                 context["live_connection"] = False
-                context["note"] = f"Alpaca Paper API returned HTTP {resp.status_code} ({resp.text[:80] if resp.text else 'unauthorized'}). Sandbox metrics active."
+                context["note"] = f"Alpaca Paper API returned HTTP {alpaca_res.status_code} ({alpaca_res.text[:80] if alpaca_res.text else 'unauthorized'}). Sandbox metrics active."
     except Exception as e:
         logger.warning(f"Error connecting to Alpaca Paper Trading: {e}")
         context["error"] = str(e)
@@ -470,7 +467,50 @@ async def get_market_feed(
     """
     log_activity_event(request, request.url.path, 200, receipt.amount_lamports, receipt.signature)
 
-    alpaca_context = await fetch_alpaca_market_context()
+    config = get_settings()
+    alpaca_headers = {
+        "APCA-API-KEY-ID": config.ALPACA_API_KEY.strip(),
+        "APCA-API-SECRET-KEY": config.ALPACA_SECRET_KEY.strip(),
+        "Accept": "application/json"
+    }
+
+    alpaca_context = {
+        "provider": "Alpaca Paper Trading",
+        "api_endpoint": "https://paper-api.alpaca.markets/v2/account",
+        "currency": "USD",
+        "portfolio_value": 100000.0,
+        "buying_power": 200000.0,
+        "cash": 100000.0,
+        "status": "connected_paper_sandbox",
+        "live_connection": False,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            alpaca_res = await client.get("https://paper-api.alpaca.markets/v2/account", headers=alpaca_headers)
+            if alpaca_res.status_code == 200:
+                data = alpaca_res.json()
+                alpaca_context.update({
+                    "portfolio_value": float(data.get("portfolio_value", 100000.0)),
+                    "buying_power": float(data.get("buying_power", 200000.0)),
+                    "cash": float(data.get("cash", 100000.0)),
+                    "status": str(data.get("status", "ACTIVE")),
+                    "live_connection": True,
+                    "account_id": data.get("id"),
+                    "currency": data.get("currency", "USD"),
+                    "daytrade_count": data.get("daytrade_count", 0),
+                })
+            else:
+                logger.warning(
+                    f"Alpaca Paper API returned HTTP {alpaca_res.status_code}: {alpaca_res.text}"
+                )
+                alpaca_context["http_status"] = alpaca_res.status_code
+                alpaca_context["live_connection"] = False
+                alpaca_context["note"] = f"Alpaca Paper API returned HTTP {alpaca_res.status_code} ({alpaca_res.text[:80] if alpaca_res.text else 'unauthorized'}). Sandbox metrics active."
+    except Exception as e:
+        logger.warning(f"Error connecting to Alpaca Paper Trading: {e}")
+        alpaca_context["error"] = str(e)
+        alpaca_context["live_connection"] = False
 
     return {
         "status": "success",
