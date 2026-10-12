@@ -321,9 +321,8 @@ async def fetch_alpaca_market_context() -> Dict[str, Any]:
     """Fetch live account and market liquidity from Alpaca Paper Trading API."""
     config = get_settings()
     headers = {
-        "APCA-API-KEY-ID": config.ALPACA_API_KEY,
-        "APCA-API-SECRET-KEY": config.ALPACA_SECRET_KEY,
-        "accept": "application/json",
+        "APCA-API-KEY-ID": config.ALPACA_API_KEY.strip(),
+        "APCA-API-SECRET-KEY": config.ALPACA_SECRET_KEY.strip(),
     }
     url = "https://paper-api.alpaca.markets/v2/account"
 

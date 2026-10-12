@@ -227,3 +227,23 @@ class ServerSettings(BaseSettings):
 def get_settings() -> ServerSettings:
     """Retrieve cached singleton instance of ServerSettings."""
     return ServerSettings()
+
+
+# Module-level configuration accessors (e.g. from server import config; config.ALPACA_API_KEY)
+_default_settings = get_settings()
+ALPACA_API_KEY: str = _default_settings.ALPACA_API_KEY
+ALPACA_SECRET_KEY: str = _default_settings.ALPACA_SECRET_KEY
+ALPACA_BASE_URL: str = _default_settings.ALPACA_BASE_URL
+NEBIUS_BASE_URL: str = _default_settings.NEBIUS_BASE_URL
+NEBIUS_API_KEY: str = _default_settings.NEBIUS_API_KEY
+NEBIUS_MODEL: str = _default_settings.NEBIUS_MODEL
+NEBIUS_FALLBACK_MODEL: str = _default_settings.NEBIUS_FALLBACK_MODEL
+
+
+def __getattr__(name: str):
+    """Dynamic fallback for any configuration attribute on the module level."""
+    s = get_settings()
+    if hasattr(s, name):
+        return getattr(s, name)
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
