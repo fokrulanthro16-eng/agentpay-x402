@@ -1,22 +1,23 @@
-"""Automated Live Deployment Script for AgentPay-x402 on Render.
+"""Automated Live Deployment Script for AgentPay-x402 on Render Cloud.
 
-Supports both:
-1. Render REST API (Automated headless deployment via RENDER_API_KEY)
-2. Playwright Browser Automation (1-Click Blueprint or Dashboard Web Service Flow)
-3. Live URL Health Verification & Build Log Monitor
+Supports:
+1. Render REST API (Headless programmatic deployment via RENDER_API_KEY)
+2. Playwright Browser Automation with Chrome Profile Persistence
+3. Live Build Log Monitoring & Public URL Health Verification
 """
 
 import argparse
 import asyncio
-import json
 import os
 from pathlib import Path
+import re
 import sys
 import time
 
 import httpx
 
 REPO_URL = "https://github.com/fokrulanthro16-eng/agentpay-x402"
+REPO_NAME = "fokrulanthro16-eng/agentpay-x402"
 SERVICE_NAME = "agentpay-x402"
 BRANCH = "main"
 BUILD_CMD = "pip install -r requirements.txt"
@@ -25,12 +26,14 @@ PLAN = "free"
 PUBLIC_URL_CANDIDATE = f"https://{SERVICE_NAME}.onrender.com"
 
 
-def check_live_endpoint(url: str, timeout: float = 5.0) -> bool:
+def check_live_endpoint(url: str, timeout: float = 6.0) -> bool:
     """Probe the health endpoint of the deployed service."""
     try:
         r = httpx.get(f"{url.rstrip('/')}/health", timeout=timeout)
-        if r.status_code == 200 and r.json().get("status") == "healthy":
-            return True
+        if r.status_code == 200:
+            data = r.json()
+            if data.get("status") == "healthy":
+                return True
     except Exception:
         pass
     return False
@@ -38,9 +41,9 @@ def check_live_endpoint(url: str, timeout: float = 5.0) -> bool:
 
 async def deploy_via_render_api(api_key: str):
     """Deploy via Render REST API (v1)."""
-    print("\n" + "=" * 70)
+    print("\n" + "=" * 75)
     print("           Deploying AgentPay-x402 via Render REST API              ")
-    print("=" * 70)
+    print("=" * 75)
     headers = {
         "Authorization": f"Bearer {api_key.strip()}",
         "Accept": "application/json",
@@ -122,120 +125,165 @@ async def deploy_via_render_api(api_key: str):
             res_deploy = await client.post(f"https://api.render.com/v1/services/{service_id}/deploys", headers=headers, json={"clearCache": "do_not_clear"})
             print(f"Deployment trigger response: HTTP {res_deploy.status_code}")
 
-        # 4. Monitor Deployment Status
+        # 4. Monitor Deployment Status & Build Logs
         print(f">> [4/4] Monitoring deployment progress...")
         deploy_url = service_url or PUBLIC_URL_CANDIDATE
-        print(f"Expected Public URL: {deploy_url}")
+        print(f"Public URL: {deploy_url}")
 
-        for attempt in range(1, 20):
+        for attempt in range(1, 25):
             res_deploys = await client.get(f"https://api.render.com/v1/services/{service_id}/deploys?limit=1", headers=headers)
             if res_deploys.status_code == 200 and res_deploys.json():
                 latest = res_deploys.json()[0].get("deploy", res_deploys.json()[0])
                 status = latest.get("status")
-                print(f"   [Polling {attempt}/20] Current Status: {status}")
+                commit_info = latest.get("commit", {}).get("message", "Latest commit")
+                print(f"   [Polling {attempt}/25] Deploy Status: {status} (Commit: {commit_info[:40]}...)")
                 if status == "live":
-                    print(f"\n>> SUCCESS: Deployment is LIVE at: {deploy_url}")
+                    print("\n" + "=" * 75)
+                    print(f"SUCCESS: AgentPay-x402 is LIVE on Render Cloud!")
+                    print(f"Public URL:       {deploy_url}")
+                    print(f"Health Endpoint:  {deploy_url}/health")
+                    print("=" * 75 + "\n")
                     return True
                 elif status in ("build_failed", "deactivated", "canceled"):
-                    print(f"\n>> Deployment ended with status: {status}")
+                    print(f"\nDeployment ended with status: {status}")
                     return False
             await asyncio.sleep(10)
 
-        print(f"\nDeployment initiated. Public endpoint will be active shortly at: {deploy_url}")
+        print(f"\nDeployment initiated. Public endpoint will be live at: {deploy_url}")
         return True
 
 
 def deploy_via_playwright(headful: bool = True):
-    """Deploy via Playwright Browser Automation."""
+    """Deploy via Playwright Browser Automation with Chrome Profile Persistence."""
     from playwright.sync_api import sync_playwright
 
     blueprint_url = f"https://render.com/deploy?repo={REPO_URL}"
     dashboard_url = "https://dashboard.render.com/select-repo?type=web"
+    session_dir = Path.home() / ".render_browser_session"
+    session_dir.mkdir(parents=True, exist_ok=True)
 
-    print("\n" + "=" * 70)
+    print("\n" + "=" * 75)
     print("      Deploying AgentPay-x402 via Playwright Browser Automation     ")
-    print("=" * 70)
-    print(f"1-Click Blueprint URL: {blueprint_url}")
-    print(f"Target Repository:     {REPO_URL}")
-    print(f"Browser Mode:          {'Headful (Visible GUI)' if headful else 'Headless'}")
-    print("=" * 70)
+    print("=" * 75)
+    print(f"Repository:           {REPO_URL}")
+    print(f"Target Service Name:  {SERVICE_NAME}")
+    print(f"Build Command:        {BUILD_CMD}")
+    print(f"Start Command:        {START_CMD}")
+    print(f"Plan Tier:            {PLAN.upper()}")
+    print(f"Browser Mode:         {'Visible Headful Browser' if headful else 'Headless'}")
+    print(f"Session Profile Dir:  {session_dir}")
+    print("=" * 75)
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=not headful, args=["--start-maximized"])
-        context = browser.new_context(viewport=None)
+        try:
+            context = p.chromium.launch_persistent_context(
+                user_data_dir=str(session_dir),
+                channel="chrome",
+                headless=not headful,
+                args=["--start-maximized"]
+            )
+        except Exception:
+            context = p.chromium.launch_persistent_context(
+                user_data_dir=str(session_dir),
+                headless=not headful,
+                args=["--start-maximized"]
+            )
+
         page = context.new_page()
 
-        print(f"\n>> Navigating to Render Blueprint deployment portal...")
-        page.goto(blueprint_url)
+        print(f"\n>> Step 1: Navigating to Render Blueprint Portal...")
+        page.goto(blueprint_url, wait_until="networkidle")
         page.wait_for_timeout(3000)
 
         current_url = page.url
         print(f"Current URL: {current_url}")
 
+        # Check if user needs to authenticate
         if "login" in current_url:
             print("\n------------------------------------------------------------")
-            print("[AUTHENTICATION REQUIRED] Render login page detected.")
-            print("Please log into Render (via GitHub or Email) in the browser window.")
-            print("Once authenticated, Render will automatically load the blueprint.")
+            print("[ACTION REQUIRED] Render Login Page Detected.")
+            print("Please click 'GitHub' or log in to Render in the open browser window.")
+            print("Once authenticated, the script will automatically continue!")
             print("------------------------------------------------------------\n")
 
-            # Wait for user to log in and redirect away from login page
+            # Click GitHub login button automatically if visible
+            github_btn = page.locator("button:has-text('GitHub'), a:has-text('GitHub')")
+            if github_btn.count() > 0:
+                print("Found 'GitHub' sign-in button. Clicking automatically...")
+                try:
+                    github_btn.first.click()
+                except Exception:
+                    pass
+
+            # Wait for user to log in and redirect to dashboard or blueprint
             try:
                 page.wait_for_url(lambda u: "login" not in u, timeout=120000)
-                print(f"PASS: Logged in successfully! Redirected to: {page.url}")
+                print(f"PASS: Authentication successful! Redirected to: {page.url}")
                 page.wait_for_timeout(3000)
             except Exception:
-                print("Timed out waiting for login. Please use the 1-Click URL below:")
+                print("Timed out waiting for login. You can use the 1-Click URL below:")
                 print(f"  {blueprint_url}")
-                browser.close()
+                context.close()
                 return
 
-        # At Blueprint / New Service Page
-        print(f">> Inspecting Blueprint configuration for '{SERVICE_NAME}'...")
-        page.wait_for_timeout(3000)
+        # Handle Blueprint creation page
+        print(f">> Step 2: Processing Blueprint / Web Service settings for '{SERVICE_NAME}'...")
+        page.wait_for_timeout(4000)
 
-        # Look for "Apply" button on Blueprint or "Create Web Service"
+        # If on Blueprint page: look for Apply button
         apply_btn = page.locator("button:has-text('Apply'), button:has-text('Create Web Service'), button:has-text('Connect')")
         if apply_btn.count() > 0:
-            print(f"Found deployment trigger button: '{apply_btn.first.text_content().strip()}'. Clicking...")
+            btn_label = apply_btn.first.text_content().strip()
+            print(f"Found deployment trigger: '{btn_label}'. Clicking...")
             apply_btn.first.click()
             page.wait_for_timeout(5000)
-            print(f"Current status page: {page.url}")
 
-        print("\n" + "=" * 70)
-        print(">> Deployment workflow initiated on Render!")
-        print(f">> Live Web Service URL: {PUBLIC_URL_CANDIDATE}")
-        print("=" * 70)
+        # Check if on service details page
+        print(f">> Step 3: Monitoring deployment page: {page.url}")
+        page.wait_for_timeout(5000)
+
+        # Look for live link on page (e.g. *.onrender.com)
+        links = page.locator("a[href*='onrender.com']").all()
+        detected_url = PUBLIC_URL_CANDIDATE
+        if links:
+            detected_url = links[0].get_attribute("href")
+            print(f"Detected Public URL: {detected_url}")
+
+        print("\n" + "=" * 75)
+        print(">> Deployment workflow initiated on Render Cloud!")
+        print(f">> Public Endpoint: {detected_url}")
+        print(f">> Health Check:    {detected_url}/health")
+        print("=" * 75 + "\n")
 
         page.wait_for_timeout(5000)
-        browser.close()
+        context.close()
 
 
-def print_manual_1click_guide():
-    """Print the instant 1-click deployment guide."""
+def print_1click_guide():
+    """Print the 1-click cloud deployment guide."""
     blueprint_url = f"https://render.com/deploy?repo={REPO_URL}"
     print("\n" + "=" * 75)
-    print("      AGENTPAY-X402: INSTANT 1-CLICK CLOUD DEPLOYMENT GUIDE           ")
+    print("      AGENTPAY-X402: 1-CLICK CLOUD DEPLOYMENT PORTAL                 ")
     print("=" * 75)
-    print("Render automatically parses 'render.yaml' committed to your GitHub repository.")
-    print("To trigger instant cloud deployment with 1 click:")
+    print("Your repository is fully configured with 'render.yaml'.")
+    print("To trigger automatic deployment on Render with 1 click:")
     print(f"\n  👉 Direct Blueprint URL: {blueprint_url}\n")
-    print("Pre-configured Service Specs (from render.yaml):")
+    print("Specifications automatically provisioned:")
     print(f"  • Name:            {SERVICE_NAME}")
     print(f"  • Repository:      {REPO_URL}")
     print(f"  • Branch:          {BRANCH}")
     print(f"  • Build Command:   {BUILD_CMD}")
     print(f"  • Start Command:   {START_CMD}")
-    print(f"  • Plan:            {PLAN.upper()}")
-    print(f"  • Public Endpoint: {PUBLIC_URL_CANDIDATE}")
+    print(f"  • Plan Tier:       {PLAN.upper()}")
+    print(f"  • Expected URL:    {PUBLIC_URL_CANDIDATE}")
     print("=" * 75 + "\n")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Deploy AgentPay-x402 to Render Cloud")
-    parser.add_argument("--api-key", help="Render API Key (or set RENDER_API_KEY env var)")
-    parser.add_argument("--headful", action="store_true", default=True, help="Run browser in headful mode for login")
-    parser.add_argument("--check-only", action="store_true", help="Only check if live endpoint is reachable")
+    parser = argparse.ArgumentParser(description="Automate AgentPay-x402 Live Deployment to Render")
+    parser.add_argument("--api-key", help="Render API Token (or set RENDER_API_KEY environment variable)")
+    parser.add_argument("--headful", action="store_true", default=True, help="Launch visible Chrome browser for OAuth")
+    parser.add_argument("--check-only", action="store_true", help="Probe if public endpoint is reachable")
     args = parser.parse_args()
 
     api_key = args.api_key or os.getenv("RENDER_API_KEY")
@@ -248,17 +296,19 @@ def main():
             print(f"NOTICE: Service is still building or not yet deployed at: {PUBLIC_URL_CANDIDATE}")
         return
 
-    print_manual_1click_guide()
+    print_1click_guide()
 
     if api_key:
+        print("RENDER_API_KEY detected. Initiating automated REST API deployment...")
         asyncio.run(deploy_via_render_api(api_key))
     else:
-        print("No RENDER_API_KEY detected. Launching browser automation flow...")
+        print("No RENDER_API_KEY environment variable detected.")
+        print("Launching Playwright Chrome automation to connect repository...")
         try:
             deploy_via_playwright(headful=args.headful)
         except Exception as e:
             print(f"Browser automation note: {e}")
-            print("You can also deploy instantly with the 1-click URL above.")
+            print(f"You can also click the 1-Click Blueprint URL above directly in your browser.")
 
 
 if __name__ == "__main__":
