@@ -319,47 +319,54 @@ async def health_check():
 
 async def fetch_alpaca_market_context() -> Dict[str, Any]:
     """Fetch live account and market liquidity from Alpaca Paper Trading API."""
-    settings = get_settings()
+    config = get_settings()
     headers = {
-        "APCA-API-KEY-ID": settings.alpaca_api_key,
-        "APCA-API-SECRET-KEY": settings.alpaca_secret_key,
+        "APCA-API-KEY-ID": config.ALPACA_API_KEY,
+        "APCA-API-SECRET-KEY": config.ALPACA_SECRET_KEY,
+        "accept": "application/json",
     }
+    url = "https://paper-api.alpaca.markets/v2/account"
 
     context = {
         "provider": "Alpaca Paper Trading",
-        "api_endpoint": settings.alpaca_base_url,
+        "api_endpoint": url,
         "currency": "USD",
         "portfolio_value": 100000.0,
         "buying_power": 200000.0,
         "cash": 100000.0,
-        "live_connection": False,
         "status": "connected_paper_sandbox",
+        "live_connection": False,
     }
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
-                f"{settings.alpaca_base_url}/v2/account",
+                url,
                 headers=headers,
             )
             if resp.status_code == 200:
                 data = resp.json()
                 context.update({
-                    "account_id": data.get("id"),
-                    "status": data.get("status"),
-                    "currency": data.get("currency", "USD"),
                     "portfolio_value": float(data.get("portfolio_value", 100000.0)),
                     "buying_power": float(data.get("buying_power", 200000.0)),
                     "cash": float(data.get("cash", 100000.0)),
-                    "daytrade_count": data.get("daytrade_count", 0),
+                    "status": str(data.get("status", "ACTIVE")),
                     "live_connection": True,
+                    "account_id": data.get("id"),
+                    "currency": data.get("currency", "USD"),
+                    "daytrade_count": data.get("daytrade_count", 0),
                 })
             else:
+                logger.warning(
+                    f"Alpaca Paper API returned HTTP {resp.status_code}: {resp.text}"
+                )
                 context["http_status"] = resp.status_code
-                context["note"] = f"Alpaca Paper API returned HTTP {resp.status_code} (credentials dispatched)."
+                context["live_connection"] = False
+                context["note"] = f"Alpaca Paper API returned HTTP {resp.status_code} ({resp.text[:80] if resp.text else 'unauthorized'}). Sandbox metrics active."
     except Exception as e:
         logger.warning(f"Error connecting to Alpaca Paper Trading: {e}")
         context["error"] = str(e)
+        context["live_connection"] = False
 
     return context
 
@@ -370,10 +377,10 @@ async def query_nebius_inference(
     max_tokens: int = 400,
 ) -> Dict[str, Any]:
     """Query Nebius Token Factory with live Alpaca market context."""
-    settings = get_settings()
+    config = get_settings()
 
     headers = {
-        "Authorization": f"Bearer {settings.nebius_api_key}",
+        "Authorization": f"Bearer {config.NEBIUS_API_KEY}",
         "Content-Type": "application/json",
     }
 
@@ -395,8 +402,10 @@ async def query_nebius_inference(
     )
 
     candidate_models = [
-        settings.nebius_model,
-        settings.nebius_fallback_model,
+        config.NEBIUS_FALLBACK_MODEL,  # "nvidia/Nemotron-3_5-Lightning" (active & verified on Nebius Token Factory)
+        config.NEBIUS_MODEL,           # "nvidia/Llama-3.1-Nemotron-70B-Instruct"
+        "nvidia/Nemotron-3-Ultra-550b-a55b",
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
         "google/gemma-3-27b-it",
     ]
 
@@ -405,7 +414,7 @@ async def query_nebius_inference(
         try:
             async with httpx.AsyncClient(timeout=25.0) as client:
                 resp = await client.post(
-                    f"{settings.nebius_base_url}/chat/completions",
+                    f"{config.NEBIUS_BASE_URL}/chat/completions",
                     headers=headers,
                     json={
                         "model": model_name,
@@ -429,7 +438,7 @@ async def query_nebius_inference(
                         "status": "success",
                     }
                 else:
-                    last_error = f"{model_name} returned HTTP {resp.status_code}"
+                    last_error = f"{model_name} returned HTTP {resp.status_code}: {resp.text[:60]}"
         except Exception as e:
             last_error = str(e)
 

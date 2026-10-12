@@ -111,43 +111,72 @@ class ServerSettings(BaseSettings):
     )
 
     # Alpaca Paper Trading Credentials & URL
-    alpaca_api_key: str = Field(
+    ALPACA_API_KEY: str = Field(
         default="PKV6FTKSBFEBUW45T4ME6AVBBE",
         description="Alpaca Paper Trading API Key ID",
         validation_alias="ALPACA_API_KEY",
     )
-    alpaca_secret_key: str = Field(
+    ALPACA_SECRET_KEY: str = Field(
         default="AxTbThigrfmXChC7H1ywTEgQehvvwR7fy1z3LfP4VhWgv",
         description="Alpaca Paper Trading Secret Key",
         validation_alias="ALPACA_SECRET_KEY",
     )
-    alpaca_base_url: str = Field(
+    ALPACA_BASE_URL: str = Field(
         default="https://paper-api.alpaca.markets",
         description="Alpaca Base API Endpoint",
         validation_alias="ALPACA_BASE_URL",
     )
 
     # Nebius Token Factory Credentials & Configuration
-    nebius_base_url: str = Field(
+    NEBIUS_BASE_URL: str = Field(
         default="https://api.tokenfactory.nebius.com/v1",
         description="Nebius Token Factory OpenAI-compatible base URL",
         validation_alias="NEBIUS_BASE_URL",
     )
-    nebius_api_key: str = Field(
+    NEBIUS_API_KEY: str = Field(
         default="v1.CmQKHHN0YXRpY2tleS1lMDB4c3Nnc2tjZDY3Z3I4M3gSIXNlcnZpY2VhY2NvdW50LWUwMGcwMDlqeXR3M2tjMGplODIMCOzrqdYGEJGLmYABOgwI6-7BoQcQgLSSjQFAAloDZTAw.AAAAAAAAAAFAIcPNAJx40-O8nE3XMudUQdcjLdjApF4SJfqVcLad7uUWbXFcVHMrtd33GqVe2EKgy0khWLFF3wXCBLRDjbMJ",
         description="Nebius Token Factory API Bearer Token",
         validation_alias="NEBIUS_API_KEY",
     )
-    nebius_model: str = Field(
+    NEBIUS_MODEL: str = Field(
         default="nvidia/Llama-3.1-Nemotron-70B-Instruct",
         description="Primary Nebius AI Model for Agent Inference",
         validation_alias="NEBIUS_MODEL",
     )
-    nebius_fallback_model: str = Field(
+    NEBIUS_FALLBACK_MODEL: str = Field(
         default="nvidia/Nemotron-3_5-Lightning",
         description="Fallback Nebius Model (e.g. meta-llama/Meta-Llama-3.1-70B-Instruct or nvidia/Nemotron-3_5-Lightning)",
         validation_alias="NEBIUS_FALLBACK_MODEL",
     )
+
+    # Lowercase property aliases for backward compatibility
+    @property
+    def alpaca_api_key(self) -> str:
+        return self.ALPACA_API_KEY
+
+    @property
+    def alpaca_secret_key(self) -> str:
+        return self.ALPACA_SECRET_KEY
+
+    @property
+    def alpaca_base_url(self) -> str:
+        return self.ALPACA_BASE_URL
+
+    @property
+    def nebius_base_url(self) -> str:
+        return self.NEBIUS_BASE_URL
+
+    @property
+    def nebius_api_key(self) -> str:
+        return self.NEBIUS_API_KEY
+
+    @property
+    def nebius_model(self) -> str:
+        return self.NEBIUS_MODEL
+
+    @property
+    def nebius_fallback_model(self) -> str:
+        return self.NEBIUS_FALLBACK_MODEL
 
     model_config = SettingsConfigDict(
         env_file=".env",
