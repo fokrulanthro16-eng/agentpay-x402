@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentPay-x402 | Autonomous Solana Devnet Payment Gateway</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Inter & JetBrains Mono Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            solana: {
+              purple: '#9945FF',
+              green: '#14F195',
+              dark: '#0e1420',
+              card: '#161e2e',
+              border: '#233048',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b0f19; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    .glow-green { box-shadow: 0 0 20px -3px rgba(20, 241, 149, 0.25); }
+    .glow-purple { box-shadow: 0 0 20px -3px rgba(153, 69, 255, 0.25); }
+  </style>
+</head>
+<body class="bg-[#080c14] text-slate-100 min-h-screen font-sans antialiased selection:bg-emerald-500 selection:text-black">
+
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-800/80 bg-[#0c121e]/90 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Logo & Protocol Badge -->
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-[#9945FF] to-[#14F195] p-0.5 flex items-center justify-center glow-green">
+          <div class="h-full w-full bg-[#0c121e] rounded-[10px] flex items-center justify-center">
+            <i data-lucide="zap" class="w-5 h-5 text-[#14F195]"></i>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">AgentPay-x402</span>
+            <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-500/10 text-[#14F195] border border-emerald-500/20">v1.0.0</span>
+          </div>
+          <p class="text-xs text-slate-400 font-mono">Autonomous HTTP 402 Gateway on Solana</p>
+        </div>
+      </div>
+
+      <!-- Network Status & Documentation -->
+      <div class="flex items-center gap-3">
+        <div class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs font-mono text-blue-400">
+          <i data-lucide="trending-up" class="w-3.5 h-3.5 text-blue-400"></i>
+          <span>Data: Alpaca Markets Live</span>
+        </div>
+
+        <div class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs font-mono text-purple-400">
+          <i data-lucide="cpu" class="w-3.5 h-3.5 text-purple-400"></i>
+          <span>Model: Nebius Nemotron-70B</span>
+        </div>
+
+        <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span class="text-slate-300">Solana Devnet</span>
+        </div>
+        
+        <a href="/docs" target="_blank" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-xs font-medium text-slate-200 transition border border-slate-700/60">
+          <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+          <span>Swagger API</span>
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- Top Status Cards: Merchant & Agent Wallets -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-5">
+      
+      <!-- Card 1: Merchant Wallet -->
+      <div class="bg-[#0f172a]/70 border border-slate-800/90 rounded-2xl p-5 relative overflow-hidden backdrop-blur">
+        <div class="absolute -top-12 -right-12 w-32 h-32 bg-[#14F195]/5 rounded-full blur-2xl pointer-events-none"></div>
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <i data-lucide="store" class="w-4 h-4 text-[#14F195]"></i> Merchant Recipient
+          </span>
+          <button onclick="refreshBalances()" title="Refresh Balance" class="text-slate-400 hover:text-slate-200 p-1 rounded hover:bg-slate-800 transition">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-xs font-mono bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+            <span id="merchant-pubkey-short" class="text-slate-300">Loading...</span>
+            <div class="flex items-center gap-1">
+              <button onclick="copyMerchantPubkey()" title="Copy Key" class="hover:text-emerald-400 transition p-1">
+                <i data-lucide="copy" class="w-3 h-3"></i>
+              </button>
+              <a id="merchant-explorer-link" href="#" target="_blank" title="View on Solana Explorer" class="hover:text-emerald-400 transition p-1">
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+            </div>
+          </div>
+          <div class="pt-1 flex items-baseline justify-between">
+            <div>
+              <span id="merchant-balance-sol" class="text-2xl font-bold font-mono tracking-tight text-white">0.000000</span>
+              <span class="text-sm font-semibold text-[#14F195] ml-1">SOL</span>
+            </div>
+            <span id="merchant-balance-lamports" class="text-xs font-mono text-slate-400">0 lamports</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Autonomous Agent Wallet -->
+      <div class="bg-[#0f172a]/70 border border-slate-800/90 rounded-2xl p-5 relative overflow-hidden backdrop-blur">
+        <div class="absolute -top-12 -right-12 w-32 h-32 bg-[#9945FF]/5 rounded-full blur-2xl pointer-events-none"></div>
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <i data-lucide="bot" class="w-4 h-4 text-[#9945FF]"></i> Autonomous Agent
+          </span>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">Signer Keypair</span>
+        </div>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-xs font-mono bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+            <span id="agent-pubkey-short" class="text-slate-300">Loading...</span>
+            <div class="flex items-center gap-1">
+              <button onclick="copyAgentPubkey()" title="Copy Key" class="hover:text-purple-400 transition p-1">
+                <i data-lucide="copy" class="w-3 h-3"></i>
+              </button>
+              <a id="agent-explorer-link" href="#" target="_blank" title="View on Solana Explorer" class="hover:text-purple-400 transition p-1">
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+            </div>
+          </div>
+          <div class="pt-1 flex items-baseline justify-between">
+            <div>
+              <span id="agent-balance-sol" class="text-2xl font-bold font-mono tracking-tight text-white">0.000000</span>
+              <span class="text-sm font-semibold text-[#9945FF] ml-1">SOL</span>
+            </div>
+            <span id="agent-balance-lamports" class="text-xs font-mono text-slate-400">0 lamports</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Gateway Protocol Registry -->
+      <div class="bg-[#0f172a]/70 border border-slate-800/90 rounded-2xl p-5 relative overflow-hidden backdrop-blur">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <i data-lucide="shield-check" class="w-4 h-4 text-cyan-400"></i> Dynamic Pricing
+          </span>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">Devnet Micropayments</span>
+        </div>
+        <div class="space-y-2 text-xs font-mono">
+          <div class="flex items-center justify-between p-2 rounded bg-slate-900/80 border border-slate-800/80">
+            <span class="text-slate-300 font-medium">GET /api/v1/market-feed</span>
+            <span class="text-[#14F195] font-bold">20,000 lamports</span>
+          </div>
+          <div class="flex items-center justify-between p-2 rounded bg-slate-900/80 border border-slate-800/80">
+            <span class="text-slate-300 font-medium">POST /api/v1/agent-inference</span>
+            <span class="text-[#9945FF] font-bold">5,000 lamports</span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Main Workspace: Interactive Controls & Live Execution -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      
+      <!-- Left Column (5 Cols): Control Deck -->
+      <section class="lg:col-span-5 space-y-6">
+        
+        <div class="bg-[#0f172a]/80 border border-slate-800 rounded-2xl p-6 space-y-6 backdrop-blur">
+          <div>
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <i data-lucide="play-circle" class="w-5 h-5 text-[#14F195]"></i>
+              Simulation & Test Controls
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">Execute the autonomous M2M client loop or trigger unauthenticated browser challenges.</p>
+          </div>
+
+          <!-- Simulation Form -->
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1.5">Target Protected Resource</label>
+              <select id="select-endpoint" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
+                <option value="/api/v1/market-feed">GET /api/v1/market-feed (20,000 lamports - Market Alpha)</option>
+                <option value="/api/v1/agent-inference">POST /api/v1/agent-inference (5,000 lamports - AI Compute)</option>
+              </select>
+            </div>
+
+            <!-- Custom Prompt (Optional for Inference) -->
+            <div id="inference-prompt-box" class="hidden">
+              <label class="block text-xs font-medium text-slate-300 mb-1.5">AI Inference Prompt</label>
+              <input id="inference-prompt" type="text" value="Analyze optimal tick range for concentrated liquidity" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-purple-500">
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="space-y-3 pt-2">
+              <button id="btn-run-agent" onclick="runAutonomousAgent()" class="w-full bg-gradient-to-r from-[#9945FF] to-[#14F195] hover:opacity-95 text-black font-semibold text-sm py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition duration-150 shadow-lg glow-green disabled:opacity-50">
+                <i data-lucide="cpu" class="w-4 h-4"></i>
+                <span id="btn-run-text">Simulate Autonomous Agent Run</span>
+              </button>
+
+              <button onclick="testUnauthenticatedBrowser()" class="w-full bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 font-medium text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition duration-150">
+                <i data-lucide="shield-alert" class="w-4 h-4 text-amber-400"></i>
+                <span>Unauthenticated Browser Test (Raw 402)</span>
+              </button>
+
+              <button onclick="testReplayAttack()" class="w-full bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 font-medium text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition duration-150">
+                <i data-lucide="repeat" class="w-4 h-4 text-rose-400"></i>
+                <span>Test Replay Attack Defense</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Protocol Specification Quick Reference -->
+        <div class="bg-[#0f172a]/60 border border-slate-800/80 rounded-2xl p-5 space-y-3 backdrop-blur text-xs">
+          <h3 class="font-semibold text-slate-300 flex items-center gap-1.5">
+            <i data-lucide="info" class="w-4 h-4 text-cyan-400"></i> RFC/x402 Protocol Flow
+          </h3>
+          <ol class="space-y-2 text-slate-400 list-decimal list-inside font-mono text-[11px]">
+            <li>Client probes endpoint with standard GET/POST.</li>
+            <li>Server challenges with <span class="text-amber-400">HTTP 402</span> + headers <code class="text-slate-300">X-402-Recipient</code>, <code class="text-slate-300">X-402-Amount</code>.</li>
+            <li>Client signs & broadcasts native SOL transfer on Devnet.</li>
+            <li>Client retries request with header <code class="text-emerald-400">X-402-Signature</code>.</li>
+            <li>Gateway verifies on-chain settlement & returns <span class="text-emerald-400">HTTP 200 OK</span>.</li>
+          </ol>
+        </div>
+
+      </section>
+
+      <!-- Right Column (7 Cols): Live Event Terminal & Activity Feed -->
+      <section class="lg:col-span-7 space-y-6">
+        
+        <!-- Live Agent Execution Terminal -->
+        <div class="bg-[#0b0f19] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+          <div class="bg-slate-900/90 px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div class="flex gap-1.5">
+                <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                <div class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></div>
+                <div class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></div>
+              </div>
+              <span class="text-xs font-mono text-slate-400 ml-2">autonomous-agent-stream.log</span>
+            </div>
+            <span id="execution-status-pill" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">IDLE</span>
+          </div>
+
+          <div id="terminal-logs" class="p-4 font-mono text-xs text-slate-300 h-64 overflow-y-auto space-y-2 select-text bg-[#070a12]">
+            <div class="text-slate-500 italic">// Waiting for agent simulation trigger...</div>
+          </div>
+        </div>
+
+        <!-- Live Activity Feed -->
+        <div class="bg-[#0f172a]/80 border border-slate-800 rounded-2xl p-5 space-y-4 backdrop-blur">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+              <i data-lucide="activity" class="w-4 h-4 text-emerald-400"></i>
+              Live Activity Feed & Settlement History
+            </h3>
+            <button onclick="clearActivityFeed()" class="text-xs text-slate-400 hover:text-slate-200 transition">Clear</button>
+          </div>
+
+          <div id="activity-feed-list" class="space-y-3 max-h-80 overflow-y-auto pr-1">
+            <div class="text-center py-8 text-xs text-slate-500 font-mono">No recent activity. Click "Simulate AI Agent Run" to begin.</div>
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- Modal for Raw 402 Challenge Viewer -->
+  <div id="modal-402" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#0f172a] border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl relative">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="px-2.5 py-1 text-xs font-bold rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">HTTP 402</span>
+          <h3 class="font-semibold text-white text-sm">Raw Protocol Challenge Response</h3>
+        </div>
+        <button onclick="closeModal402()" class="text-slate-400 hover:text-white p-1 rounded">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <p class="text-xs text-slate-400">
+          When an unauthenticated agent or browser queries a protected endpoint without payment, the gateway rejects with status 402 and provides machine-readable payment parameters:
+        </p>
+
+        <!-- Response Headers -->
+        <div>
+          <label class="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Response Headers</label>
+          <pre id="modal-402-headers" class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs font-mono text-emerald-400 overflow-x-auto mt-1"></pre>
+        </div>
+
+        <!-- Response Body -->
+        <div>
+          <label class="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Response Body (JSON)</label>
+          <pre id="modal-402-body" class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs font-mono text-cyan-300 overflow-x-auto mt-1"></pre>
+        </div>
+      </div>
+
+      <div class="pt-2 flex justify-end">
+        <button onclick="closeModal402()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 rounded-xl transition">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Application Logic -->
+  <script>
+    let merchantPubkey = "";
+    let agentPubkey = "";
+    let lastValidSignature = "";
+
+    // Toggle custom prompt input when endpoint changes
+    document.getElementById('select-endpoint').addEventListener('change', (e) => {
+      const isInfer = e.target.value.includes('inference');
+      document.getElementById('inference-prompt-box').classList.toggle('hidden', !isInfer);
+    });
+
+    // Initialize Dashboard
+    async function initDashboard() {
+      lucide.createIcons();
+      await refreshBalances();
+      await loadActivityFeed();
+    }
+
+    // Refresh wallet balances and metadata
+    async function refreshBalances() {
+      try {
+        const res = await fetch('/api/demo/merchant-balance');
+        if (!res.ok) throw new Error('Failed to fetch wallet info');
+        const data = await res.json();
+
+        merchantPubkey = data.merchant.pubkey;
+        agentPubkey = data.agent.pubkey;
+
+        // Render Merchant
+        document.getElementById('merchant-pubkey-short').textContent = shortenKey(merchantPubkey);
+        document.getElementById('merchant-balance-sol').textContent = data.merchant.balance_sol.toFixed(6);
+        document.getElementById('merchant-balance-lamports').textContent = `${data.merchant.balance_lamports.toLocaleString()} lamports`;
+        document.getElementById('merchant-explorer-link').href = `https://explorer.solana.com/address/${merchantPubkey}?cluster=devnet`;
+
+        // Render Agent
+        document.getElementById('agent-pubkey-short').textContent = shortenKey(agentPubkey);
+        document.getElementById('agent-balance-sol').textContent = data.agent.balance_sol.toFixed(6);
+        document.getElementById('agent-balance-lamports').textContent = `${data.agent.balance_lamports.toLocaleString()} lamports`;
+        document.getElementById('agent-explorer-link').href = `https://explorer.solana.com/address/${agentPubkey}?cluster=devnet`;
+
+      } catch (err) {
+        console.error('Error refreshing balance:', err);
+      }
+    }
+
+    function shortenKey(k) {
+      if (!k || k.length < 12) return k || "N/A";
+      return `${k.slice(0, 6)}...${k.slice(-6)}`;
+    }
+
+    function copyMerchantPubkey() {
+      navigator.clipboard.writeText(merchantPubkey);
+      alert('Merchant Public Key copied!');
+    }
+
+    function copyAgentPubkey() {
+      navigator.clipboard.writeText(agentPubkey);
+      alert('Agent Public Key copied!');
+    }
+
+    // Run Autonomous Agent Simulation with Live SSE Streaming
+    async function runAutonomousAgent() {
+      const endpoint = document.getElementById('select-endpoint').value;
+      const prompt = document.getElementById('inference-prompt').value;
+      const btn = document.getElementById('btn-run-agent');
+      const btnText = document.getElementById('btn-run-text');
+      const statusPill = document.getElementById('execution-status-pill');
+      const terminal = document.getElementById('terminal-logs');
+
+      btn.disabled = true;
+      btnText.textContent = "Agent Executing...";
+      statusPill.textContent = "RUNNING";
+      statusPill.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400";
+      terminal.innerHTML = "";
+
+      const appendLog = (html) => {
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        terminal.appendChild(div);
+        terminal.scrollTop = terminal.scrollHeight;
+      };
+
+      appendLog(`<span class="text-slate-500">[${new Date().toLocaleTimeString()}]</span> <span class="text-cyan-400 font-semibold">&gt;&gt; Initializing Autonomous Agent M2M Loop...</span>`);
+
+      try {
+        // Connect via Server-Sent Events (SSE)
+        const eventSource = new EventSource(`/api/demo/run-agent-stream?endpoint=${encodeURIComponent(endpoint)}&prompt=${encodeURIComponent(prompt)}`);
+
+        eventSource.onmessage = (e) => {
+          const ev = JSON.parse(e.data);
+          const timeStr = `<span class="text-slate-500">[${new Date().toLocaleTimeString()}]</span>`;
+
+          if (ev.type === 'probe') {
+            appendLog(`${timeStr} <span class="text-amber-400">Phase 1: Probe</span> &rarr; Dispatched ${ev.method} ${ev.endpoint} without credentials.`);
+          } else if (ev.type === 'challenge_402') {
+            appendLog(`${timeStr} <span class="text-rose-400 font-bold">&larr; HTTP 402 INTERCEPTED</span>: Requires ${ev.amount_lamports.toLocaleString()} lamports -> ${shortenKey(ev.recipient)}`);
+          } else if (ev.type === 'signing') {
+            appendLog(`${timeStr} <span class="text-purple-400">Phase 2: On-Chain Synthesis</span> &rarr; Constructing SOL transfer & signing via Solders Ed25519 Keypair...`);
+          } else if (ev.type === 'broadcast') {
+            lastValidSignature = ev.signature;
+            appendLog(`${timeStr} <span class="text-emerald-400 font-bold">&check; Settlement Confirmed:</span> <a href="https://explorer.solana.com/tx/${ev.signature}?cluster=devnet" target="_blank" class="underline text-emerald-300 hover:text-white">${shortenKey(ev.signature)}</a>`);
+          } else if (ev.type === 'retry') {
+            appendLog(`${timeStr} <span class="text-cyan-400">Phase 3: Retry</span> &rarr; Resubmitting request with <code class="text-slate-200">X-402-Signature: ${shortenKey(ev.signature)}</code>...`);
+          } else if (ev.type === 'success') {
+            appendLog(`${timeStr} <span class="text-emerald-400 font-bold">&starf; HTTP 200 OK UNLOCKED!</span> Total: ${ev.telemetry.total_workflow_latency_ms.toFixed(1)}ms (On-chain: ${ev.telemetry.settlement_latency_ms.toFixed(1)}ms)`);
+            
+            // Render genuine Nemotron reasoning trace cleanly in the console window
+            if (ev.payload.output && ev.payload.output.reasoning) {
+              const reasoningClean = String(ev.payload.output.reasoning).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+              appendLog(`
+                <div class="mt-2.5 p-3.5 bg-purple-950/60 rounded-xl border border-purple-500/40 text-xs font-sans text-purple-100 shadow-lg">
+                  <div class="flex items-center justify-between mb-2 pb-1.5 border-b border-purple-800/60">
+                    <span class="font-bold text-purple-300 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                      <i data-lucide="sparkles" class="w-3.5 h-3.5 text-purple-400"></i>
+                      Nebius Token Factory (Nemotron-70B) Authentic Reasoning Trace:
+                    </span>
+                    <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">${ev.payload.model || 'Nemotron-70B'}</span>
+                  </div>
+                  <div class="font-mono text-[11px] leading-relaxed whitespace-pre-wrap max-h-56 overflow-y-auto text-purple-100 select-text bg-purple-950/40 p-2.5 rounded-lg border border-purple-900/60">${reasoningClean}</div>
+                </div>
+              `);
+            }
+
+            // Render Alpaca Paper Trading metrics if present
+            if (ev.payload.alpaca_portfolio) {
+              const p = ev.payload.alpaca_portfolio;
+              appendLog(`
+                <div class="mt-2 p-2.5 bg-blue-950/50 rounded-xl border border-blue-500/30 text-xs font-mono text-blue-200 flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <span class="font-semibold text-blue-300 flex items-center gap-1"><i data-lucide="trending-up" class="w-3.5 h-3.5 text-blue-400"></i> Alpaca Paper Context:</span>
+                    <span>Portfolio: <b>$${(p.portfolio_value || 100000).toLocaleString()}</b></span>
+                    <span>Buying Power: <b>$${(p.buying_power || 200000).toLocaleString()}</b></span>
+                  </div>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">${p.status || 'CONNECTED'}</span>
+                </div>
+              `);
+            }
+
+            appendLog(`<div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 mt-2 max-h-36 overflow-y-auto">${JSON.stringify(ev.payload, null, 2)}</div>`);
+            
+            eventSource.close();
+            btn.disabled = false;
+            btnText.textContent = "Simulate Autonomous Agent Run";
+            statusPill.textContent = "SETTLED";
+            statusPill.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400";
+            refreshBalances();
+            loadActivityFeed();
+            lucide.createIcons();
+          } else if (ev.type === 'error') {
+            appendLog(`${timeStr} <span class="text-rose-400 font-bold">&cross; ERROR:</span> ${ev.message}`);
+            eventSource.close();
+            btn.disabled = false;
+            btnText.textContent = "Simulate Autonomous Agent Run";
+            statusPill.textContent = "FAILED";
+            statusPill.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-400";
+          }
+        };
+
+        eventSource.onerror = (err) => {
+          appendLog(`<span class="text-rose-400">Stream ended or encountered an interruption.</span>`);
+          eventSource.close();
+          btn.disabled = false;
+          btnText.textContent = "Simulate Autonomous Agent Run";
+        };
+
+      } catch (err) {
+        appendLog(`<span class="text-rose-400">Failed to initiate agent simulation: ${err.message}</span>`);
+        btn.disabled = false;
+        btnText.textContent = "Simulate Autonomous Agent Run";
+      }
+    }
+
+    // Unauthenticated Browser Test (Modal popup with raw 402 response)
+    async function testUnauthenticatedBrowser() {
+      try {
+        const res = await fetch('/api/v1/market-feed');
+        const headersObj = {};
+        for (let [k, v] of res.headers.entries()) {
+          if (k.toLowerCase().startsWith('x-402') || k.toLowerCase() === 'content-type') {
+            headersObj[k] = v;
+          }
+        }
+        const body = await res.json();
+
+        document.getElementById('modal-402-headers').textContent = JSON.stringify(headersObj, null, 2);
+        document.getElementById('modal-402-body').textContent = JSON.stringify(body, null, 2);
+        document.getElementById('modal-402').classList.remove('hidden');
+        loadActivityFeed();
+      } catch (err) {
+        alert('Browser test failed: ' + err.message);
+      }
+    }
+
+    function closeModal402() {
+      document.getElementById('modal-402').classList.add('hidden');
+    }
+
+    // Test Replay Attack Defense
+    async function testReplayAttack() {
+      if (!lastValidSignature) {
+        alert('Please run a simulation first to generate a valid transaction signature.');
+        return;
+      }
+      try {
+        const res = await fetch('/api/v1/market-feed', {
+          headers: { 'X-402-Signature': lastValidSignature }
+        });
+        const data = await res.json();
+        alert(`Replay Attack Result:\nStatus: ${res.status} (Expected: 402)\nDetail: ${data.detail || data.error}`);
+        loadActivityFeed();
+      } catch (err) {
+        alert('Replay test error: ' + err.message);
+      }
+    }
+
+    // Load recent activity feed items
+    async function loadActivityFeed() {
+      try {
+        const res = await fetch('/api/demo/activity');
+        if (!res.ok) return;
+        const items = await res.json();
+        const container = document.getElementById('activity-feed-list');
+        
+        if (!items || items.length === 0) {
+          container.innerHTML = `<div class="text-center py-8 text-xs text-slate-500 font-mono">No recent activity. Click "Simulate AI Agent Run" to begin.</div>`;
+          return;
+        }
+
+        container.innerHTML = items.map(item => {
+          const is200 = item.status === 200;
+          const statusBadge = is200
+            ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">200 SETTLED</span>`
+            : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">402 CHALLENGED</span>`;
+
+          const sigLink = item.signature
+            ? `<a href="https://explorer.solana.com/tx/${item.signature}?cluster=devnet" target="_blank" class="text-[11px] font-mono text-cyan-400 hover:underline flex items-center gap-1">${shortenKey(item.signature)} <i data-lucide="external-link" class="w-2.5 h-2.5"></i></a>`
+            : `<span class="text-[11px] font-mono text-slate-500">None</span>`;
+
+          return `
+            <div class="bg-slate-900/70 border border-slate-800/80 p-3 rounded-xl flex items-center justify-between text-xs transition hover:border-slate-700">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-mono text-slate-300 font-medium">${item.endpoint}</span>
+                  ${statusBadge}
+                </div>
+                <div class="text-[11px] text-slate-400 font-mono flex items-center gap-3">
+                  <span>${item.time}</span>
+                  <span>Amount: <b class="text-slate-300">${item.amount_lamports.toLocaleString()}</b> lamports</span>
+                </div>
+              </div>
+              <div class="text-right">
+                ${sigLink}
+              </div>
+            </div>
+          `;
+        }).join('');
+        lucide.createIcons();
+      } catch (e) {
+        console.error('Failed to load activity:', e);
+      }
+    }
+
+    function clearActivityFeed() {
+      fetch('/api/demo/activity/clear', { method: 'POST' }).then(() => loadActivityFeed());
+    }
+
+    // Start on DOM load
+    window.addEventListener('DOMContentLoaded', initDashboard);
+  </script>
+</body>
+</html>
