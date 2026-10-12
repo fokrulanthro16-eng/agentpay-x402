@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: agentpay-x402
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: SOLANA_RPC_URL
+        value: https://api.devnet.solana.com
+      - key: SOLANA_NETWORK
+        value: solana-devnet
+      - key: SOLANA_COMMITMENT
+        value: confirmed
+      - key: MOCK_SETTLEMENT
+        value: "true"
+      - key: REPLAY_CACHE_TTL_SECONDS
+        value: "86400"
+      - key: ALPACA_API_KEY
+        value: PKV6FTKSBFEBUW45T4ME6AVBBE
+      - key: ALPACA_SECRET_KEY
+        value: AxTbThigrfmXChC7H1ywTEgQehvvwR7fy1z3LfP4VhWgv
+      - key: ALPACA_BASE_URL
+        value: https://paper-api.alpaca.markets
+      - key: NEBIUS_BASE_URL
+        value: https://api.tokenfactory.nebius.com/v1
+      - key: NEBIUS_MODEL
+        value: nvidia/Nemotron-3_5-Lightning
+      - key: NEBIUS_FALLBACK_MODEL
+        value: nvidia/Nemotron-3_5-Lightning

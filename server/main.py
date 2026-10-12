@@ -207,14 +207,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS Middleware
+# CORS Middleware for universal cross-origin web & agent access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
-    allow_headers=["*", "X-402-Signature", "X-402-Recipient", "X-402-Amount", "X-402-Network"],
-    expose_headers=["X-402-Recipient", "X-402-Amount", "X-402-Network", "X-402-Token"],
+    allow_headers=["*"],
+    expose_headers=[
+        "X-402-Recipient",
+        "X-402-Amount",
+        "X-402-Network",
+        "X-402-Token",
+        "X-402-Signature",
+        "Content-Type",
+    ],
 )
 
 
